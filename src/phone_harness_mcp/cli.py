@@ -48,7 +48,7 @@ def build_http_app(*, api: str | None, mcp_path: str, host: str, allowed_hosts: 
                    stateful: bool, oauth_scope: str | None = DEFAULT_OAUTH_SCOPE):
     """The ASGI app for `--port`. Separate from `main` so tests can serve it."""
     from starlette.requests import Request
-    from starlette.responses import JSONResponse
+    from starlette.responses import JSONResponse, HTMLResponse
 
     auth = token_verifier = None
     if oauth_issuer:
@@ -72,8 +72,101 @@ def build_http_app(*, api: str | None, mcp_path: str, host: str, allowed_hosts: 
 
     @server.custom_route("/", methods=["GET"])
     async def index(request: Request):
-        return JSONResponse({"name": "phone-harness", "version": __version__, "mcp": mcp_path,
-                             "docs": "https://github.com/phone-harness/mcp"})
+        # Return HTML for browsers, JSON for API clients
+        accept = request.headers.get("accept", "")
+        if "text/html" in accept:
+            html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phone Harness MCP Server</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            line-height: 1.6;
+            color: #333;
+        }}
+        h1 {{
+            color: #000;
+            border-bottom: 2px solid #000;
+            padding-bottom: 0.5rem;
+        }}
+        .info {{
+            background: #f5f5f5;
+            padding: 1rem;
+            border-radius: 4px;
+            margin: 1rem 0;
+        }}
+        .info-item {{
+            margin: 0.5rem 0;
+        }}
+        .label {{
+            font-weight: 600;
+            display: inline-block;
+            width: 120px;
+        }}
+        a {{
+            color: #0070f3;
+            text-decoration: none;
+        }}
+        a:hover {{
+            text-decoration: underline;
+        }}
+        .description {{
+            margin: 1.5rem 0;
+        }}
+    </style>
+    <script>
+        window.si = window.si || function () {{ (window.siq = window.siq || []).push(arguments); }};
+    </script>
+    <script defer src="/_vercel/speed-insights/script.js"></script>
+</head>
+<body>
+    <h1>Phone Harness MCP Server 🔌</h1>
+    
+    <div class="description">
+        <p>Give any MCP agent a real iPhone or an Android emulator in the cloud.</p>
+        <p>This server provides MCP (Model Context Protocol) tools to control real phones and emulators.</p>
+    </div>
+    
+    <div class="info">
+        <div class="info-item">
+            <span class="label">Service:</span>
+            <span>phone-harness</span>
+        </div>
+        <div class="info-item">
+            <span class="label">Version:</span>
+            <span>{__version__}</span>
+        </div>
+        <div class="info-item">
+            <span class="label">MCP Endpoint:</span>
+            <span><code>{mcp_path}</code></span>
+        </div>
+        <div class="info-item">
+            <span class="label">Documentation:</span>
+            <span><a href="https://github.com/phone-harness/mcp" target="_blank">GitHub Repository</a></span>
+        </div>
+        <div class="info-item">
+            <span class="label">Website:</span>
+            <span><a href="https://phone-harness.com" target="_blank">phone-harness.com</a></span>
+        </div>
+    </div>
+    
+    <h2>Setup</h2>
+    <p>To use this server, add it as a custom connector in your MCP client:</p>
+    <p><code>https://mcp.phone-harness.com/mcp</code></p>
+    
+    <p>For detailed setup instructions for Claude, Cursor, ChatGPT, and other clients, see the <a href="https://github.com/phone-harness/mcp" target="_blank">documentation</a>.</p>
+</body>
+</html>"""
+            return HTMLResponse(html_content)
+        else:
+            return JSONResponse({"name": "phone-harness", "version": __version__, "mcp": mcp_path,
+                                 "docs": "https://github.com/phone-harness/mcp"})
 
     app = server.streamable_http_app(streamable_http_path=mcp_path, json_response=True, stateless_http=not stateful,
                                      transport_security=_security(host, allowed_hosts, allowed_origins), host=host)
